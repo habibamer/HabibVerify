@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabibVerify | Multi-Platform Certificate Verification Suite</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="badge">Multi-Platform Verification Suite</div>
+            <h1>HabibVerify</h1>
+            <p>Instant, automated verification for professional certificates across top global platforms.</p>
+            <div class="author-tag">Developed by <span>Habib Amer</span></div>
+        </header>
+
+        <!-- Platforms Grid -->
+        <main class="container">
+            <!-- Coursera -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="platform-icon coursera">C</span>
+                    <h3>Coursera</h3>
+                </div>
+                <p class="card-desc">Verify professional certificates & degrees</p>
+                <input type="text" id="courseraInput" class="input-box" placeholder="Enter Certificate ID or URL">
+                <button class="btn btn-primary" onclick="verifyCoursera()">Verify Certificate</button>
+            </div>
+
+            <!-- edX -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="platform-icon edx">E</span>
+                    <h3>edX</h3>
+                </div>
+                <p class="card-desc">Verify university & institutional credentials</p>
+                <input type="text" id="edxInput" class="input-box" placeholder="Enter Certificate ID or URL">
+                <button class="btn btn-primary" onclick="verifyEdx()">Verify Certificate</button>
+            </div>
+
+            <!-- CS50 -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="platform-icon cs50">50</span>
+                    <h3>CS50 Harvard</h3>
+                </div>
+                <p class="card-desc">Verify computer science course certificates</p>
+                <input type="text" id="cs50Input" class="input-box" placeholder="Enter Certificate URL">
+                <button class="btn btn-primary" onclick="verifyCs50()">Verify Certificate</button>
+            </div>
+
+            <!-- Udemy -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="platform-icon udemy">U</span>
+                    <h3>Udemy</h3>
+                </div>
+                <p class="card-desc">Verify online skill & course certificates</p>
+                <input type="text" id="udemyInput" class="input-box" placeholder="Enter Certificate ID number">
+                <button class="btn btn-primary" onclick="verifyUdemy()">Verify Certificate</button>
+            </div>
+
+            <!-- freeCodeCamp -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="platform-icon fcc">fCC</span>
+                    <h3>freeCodeCamp</h3>
+                </div>
+                <p class="card-desc">Verify web dev & programming credentials</p>
+                <input type="text" id="freecodecampInput" class="input-box" placeholder="Enter Full Certificate URL">
+                <button class="btn btn-primary" onclick="verifyFreeCodeCamp()">Verify Certificate</button>
+            </div>
+        </main>
+
+        <!-- Results Section -->
+        <section class="results-card">
+            <div class="results-header">
+                <h3>Verification Results</h3>
+                <span id="certStatus" class="status-badge status-idle">Ready to Verify</span>
+            </div>
+            <div class="results-grid">
+                <div class="result-item">
+                    <span class="label">Learner Name</span>
+                    <span class="value" id="learnerName">—</span>
+                </div>
+                <div class="result-item">
+                    <span class="label">Course / Program</span>
+                    <span class="value" id="courseName">—</span>
+                </div>
+                <div class="result-item">
+                    <span class="label">Platform</span>
+                    <span class="value" id="platformName">—</span>
+                </div>
+                <div class="result-item">
+                    <span class="label">Issue Date</span>
+                    <span class="value" id="issueDate">—</span>
+                </div>
+                <div class="result-item">
+                    <span class="label">Certificate ID</span>
+                    <span class="value" id="certId">—</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2026 HabibVerify. All rights reserved.</p>
+            <p class="footer-sub">Designed & Built with precision by <strong>Habib Amer</strong></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
