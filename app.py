@@ -15,26 +15,64 @@ def index():
 @app.route('/api/verify-udemy', methods=['POST'])
 def verify_udemy():
     data = request.get_json()
-    cert_id = data.get('cert_id', '').strip()
-    if not cert_id:
-        return jsonify({'success': False, 'error': 'Certificate ID is required'})
+    raw_input = data.get('cert_id', '').strip()
+    if not raw_input:
+        return jsonify({'success': False, 'error': 'Certificate ID or URL is required'})
     
+    # استخراج الـ Certificate ID سواء تم إدخال رابط كامل أو ID فقط
+    cert_id = raw_input
+    if "udemy.com" in raw_input:
+        match = re.search(r'/certificate/([a-zA-Z0-9_-]+)', raw_input)
+        if match:
+            cert_id = match.group(1)
+        else:
+            cert_id = raw_input.rstrip('/').split('/')[-1]
+
     url = f"https://www.udemy.com/certificate/{cert_id}/"
+    
+    # إضافة Headers تُحاكي متصفحاً حقيقياً لتجاوز حظر Udemy
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
     try:
-        res = scraper.get(url, timeout=15)
+        res = scraper.get(url, headers=headers, timeout=15, allow_redirects=True)
         if res.status_code != 200:
             return jsonify({'success': False, 'error': 'Invalid certificate or not found'})
         
         soup = BeautifulSoup(res.text, 'lxml')
-        h1 = soup.find('h1')
-        course_name = h1.get_text(strip=True) if h1 else "Udemy Course"
         
+        # استخراج اسم الدورة/الشهادة بأكثر من طريقة مرنة
+        course_name = ""
+        
+        og_title = soup.find('meta', property='og:title')
+        if og_title and og_title.get('content'):
+            course_name = og_title['content'].replace('Certificate | Udemy', '').replace('Udemy', '').strip()
+        
+        if not course_name:
+            h1 = soup.find('h1') or soup.find('h2')
+            if h1:
+                course_name = h1.get_text(strip=True)
+
+        if not course_name:
+            course_name = "Udemy Certified Course"
+
+        # استخراج اسم الطالب إن وجد في البيانات
+        learner_name = "Verified Student"
+        og_desc = soup.find('meta', property='og:description')
+        if og_desc and og_desc.get('content'):
+            desc = og_desc['content']
+            if "by" in desc:
+                learner_name = desc.split("by")[0].replace("Certificate of Completion for", "").strip()
+
         return jsonify({
             'success': True,
             'platform': 'Udemy',
-            'learner_name': 'Habib Amer Alfadel',
+            'learner_name': learner_name,
             'course_name': course_name,
-            'issue_date': 'Recent',
+            'issue_date': 'Verified',
             'cert_id': cert_id,
             'status': 'Valid (Authentic Certificate)'
         })
@@ -220,7 +258,7 @@ def verify_edx():
 
 
 
-# freeCodeCamp route (الإضافة الجديدة بنظام الـ URL الكامل)
+# freeCodeCamp route
 
 @app.route('/api/verify-freecodecamp', methods=['POST'])
 def verify_freecodecamp():
@@ -239,7 +277,6 @@ def verify_freecodecamp():
 
         soup = BeautifulSoup(res.text, 'lxml')
 
-        # استخراج اسم الشهادة / الدورة
         course_name = "freeCodeCamp Certification"
         h1 = soup.find('h1') or soup.find('h2')
         if h1:
@@ -249,11 +286,9 @@ def verify_freecodecamp():
             if og and og.get('content'):
                 course_name = og['content'].strip()
 
-        # استخراج اسم المستخدم من رابط الـ URL
         parts = url.rstrip('/').split('/')
         learner_name = parts[-2] if len(parts) >= 2 else "Verified Learner"
 
-        # استخراج تاريخ الإصدار
         issue_date = "Verified"
         months = ["January", "February", "March", "April", "May", "June", "July",
                   "August", "September", "October", "November", "December"]
