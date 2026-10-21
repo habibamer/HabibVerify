@@ -2,4 +2,5 @@ flask
 cloudscraper
 beautifulsoup4
 lxml
+pypdf
 gunicorn
