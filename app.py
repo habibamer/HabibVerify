@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import re
 import json
 import html as html_lib
+from io import BytesIO
+from pypdf import PdfReader
 
 app = Flask(__name__)
 scraper = cloudscraper.create_scraper()
@@ -120,7 +122,6 @@ def verify_coursera():
 
 
 
-# edX helpers & route
 
 def extract_edx(page_text):
     soup = BeautifulSoup(page_text, 'lxml')
@@ -190,7 +191,7 @@ def verify_edx():
 
 
 
-# freeCodeCamp route
+
 
 @app.route('/api/verify-freecodecamp', methods=['POST'])
 def verify_freecodecamp():
@@ -243,29 +244,105 @@ def verify_freecodecamp():
         return jsonify({'success': False, 'error': str(e)})
 
 
+# CS50 helpers & route
+# Certificate links look like https://cs50.harvard.edu/certificates/<uuid>
+# and are served as a PDF from https://certificates.cs50.io/<uuid>.pdf
+
+UUID_RE = re.compile(
+    r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+
+_UNITS = {w: i for i, w in enumerate(
+    ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+     "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+     "sixteen", "seventeen", "eighteen", "nineteen"])}
+_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+         "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90}
+
+def _words_to_number(text):
+    """'two thousand twenty-three' -> 2023 (returns None if it can't parse)."""
+    total, current = 0, 0
+    for tok in re.split(r'[\s-]+', text.lower().strip(' .')):
+        if tok in _UNITS:
+            current += _UNITS[tok]
+        elif tok in _TENS:
+            current += _TENS[tok]
+        elif tok == "hundred":
+            current = (current or 1) * 100
+        elif tok == "thousand":
+            total += (current or 1) * 1000
+            current = 0
+        elif tok in ("and", ""):
+            continue
+        else:
+            return None
+    return total + current or None
+
+def extract_cs50(pdf_bytes):
+    """Read name, course and year from the certificate PDF text."""
+    reader = PdfReader(BytesIO(pdf_bytes))
+    text = " ".join((page.extract_text() or "") for page in reader.pages)
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    name = re.search(r'congratulates\s+(.+?)\s+on completion of', text, re.I)
+    course = re.search(r'on completion of\s+(.+?)(?:,\s*including|\.\s|\.$|$)', text, re.I)
+    year = re.search(r'in the year\s+(.+?)\.', text, re.I)
+
+    learner_name = name.group(1).strip() if name else ""
+    course_name = course.group(1).strip() if course else ""
+    issue_year = ""
+    if year:
+        n = _words_to_number(year.group(1))
+        issue_year = str(n) if n else year.group(1).strip()
+
+    return learner_name, course_name, issue_year, text
+
+
 @app.route('/api/verify-cs50', methods=['POST'])
 def verify_cs50():
-    data = request.get_json()
-    url = data.get('url', '').strip()
-    if not url:
+    data = request.get_json(silent=True) or {}
+    raw_input = (data.get('url') or data.get('cert_id') or '').strip()
+    if not raw_input:
         return jsonify({'success': False, 'error': 'Certificate URL is required'})
-    
+
+    # Only the UUID is taken from the input; the URL we fetch is built by us
+    # from official hosts, so users can't make the server request arbitrary sites.
+    match = UUID_RE.search(raw_input)
+    if not match:
+        return jsonify({'success': False, 'error': 'Invalid CS50 certificate link or ID'})
+    cert_id = match.group(0).lower()
+
+    urls = [
+        f"https://certificates.cs50.io/{cert_id}.pdf?size=letter",
+        f"https://cs50.harvard.edu/certificates/{cert_id}",
+    ]
+
     try:
-        res = scraper.get(url, timeout=15)
-        if res.status_code == 200:
+        for url in urls:
+            res = scraper.get(url, timeout=20, allow_redirects=True)
+            if res.status_code != 200 or not res.content.startswith(b'%PDF'):
+                continue
+
+            learner_name, course_name, issue_year, text = extract_cs50(res.content)
+
+            # Must look like a real CS50 certificate and carry the same ID in its footer
+            looks_real = "CS50" in text and "congratulates" in text.lower()
+            id_matches = cert_id in text.replace(" ", "").lower()
+            if not (looks_real and learner_name and id_matches):
+                continue
+
             return jsonify({
                 'success': True,
                 'platform': 'CS50',
-                'learner_name': 'Habib Amer Alfadel',
-                'course_name': 'CS50x: Introduction to Computer Science',
-                'issue_date': '2026',
-                'cert_id': url.split('/')[-1] if '/' in url else 'CS50',
-                'status': 'Valid (PDF Verified)'
+                'learner_name': learner_name,
+                'course_name': course_name or 'CS50',
+                'issue_date': issue_year or 'Unknown',
+                'cert_id': cert_id,
+                'status': 'Valid (Certificate found on CS50)'
             })
-        else:
-            return jsonify({'success': False, 'error': 'Invalid CS50 certificate URL'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+
+        return jsonify({'success': False, 'error': 'Certificate not found'})
+    except Exception:
+        return jsonify({'success': False, 'error': 'Could not verify the certificate right now'})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
